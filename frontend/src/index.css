@@ -1,0 +1,78 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(ellipse 1200px 600px at 50% -10%, #1a1508 0%, transparent 60%),
+    #0d1012;
+  color: #e8e6e1;
+  font-family: 'IBM Plex Sans', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: #f0a03044;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #2a3035;
+  border-radius: 4px;
+}
+
+.font-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.panel {
+  background: #161a1d;
+  border: 1px solid #2a3035;
+  border-radius: 10px;
+}
+
+.hairline {
+  border-color: #2a3035;
+}
+
+/* subtle scanline texture used sparingly on hero/panel edges for the HUD feel */
+.scanline-edge {
+  position: relative;
+}
+.scanline-edge::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 2px,
+    rgba(240, 160, 48, 0.02) 3px,
+    transparent 4px
+  );
+  border-radius: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+.focus-ring:focus-visible {
+  outline: 2px solid #f0a030;
+  outline-offset: 2px;
+}

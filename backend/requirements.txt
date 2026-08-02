@@ -1,0 +1,37 @@
+# --- Web framework ---
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+pydantic==2.10.4
+pydantic-settings==2.7.0
+python-multipart==0.0.20
+
+# --- Supabase / Postgres ---
+supabase==2.11.0
+
+# --- Auth (Sign-In With Ethereum) ---
+eth-account==0.13.4
+web3==7.6.1
+pyjwt==2.10.1
+
+# --- Security ---
+cryptography==44.0.0
+
+# --- MT5 bridge (cloud, works on Linux — see backend/services/mt5_service.py) ---
+metaapi-cloud-sdk>=29.1.1
+
+# --- Data / backtest ---
+pandas==2.2.3
+numpy==2.2.1
+
+# --- AI agent (pluggable, Anthropic default) ---
+anthropic==0.42.0
+openai==1.58.1
+httpx==0.28.1
+
+# --- Payments ---
+requests==2.32.3
+
+# --- Utilities ---
+python-dotenv==1.0.1
+loguru==0.7.3
+apscheduler==3.11.0
