@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard.jsx'
 import Trade from './pages/Trade.jsx'
 import RiskSettings from './pages/RiskSettings.jsx'
 import Backtest from './pages/Backtest.jsx'
+import Automation from './pages/Automation.jsx'
 import AIInsights from './pages/AIInsights.jsx'
 import Billing from './pages/Billing.jsx'
 
@@ -36,6 +37,7 @@ export default function App() {
       <Route path="/trade" element={<Protected><Trade /></Protected>} />
       <Route path="/risk" element={<Protected><RiskSettings /></Protected>} />
       <Route path="/backtest" element={<Protected><Backtest /></Protected>} />
+      <Route path="/automation" element={<Protected><Automation /></Protected>} />
       <Route path="/ai" element={<Protected><AIInsights /></Protected>} />
       <Route path="/billing" element={<Protected><Billing /></Protected>} />
       <Route path="*" element={<Navigate to="/" replace />} />

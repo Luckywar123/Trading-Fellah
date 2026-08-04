@@ -27,7 +27,11 @@ async def _execute_backtest(run_id: str, account_id: str, body: BacktestRequest)
                            low=c["low"], close=c["close"], volume=c.get("tickVolume", 0)) for c in raw]
 
         risk_cfg = resolve_preset(body.risk_preset)
-        engine = BacktestEngine(risk_cfg)
+        spec = await mt5_service.get_symbol_spec(account["metaapi_account_id"], body.symbol)
+        engine = BacktestEngine(
+            risk_cfg, pip_value_per_lot=spec["pip_value_per_lot"],
+            contract_size=spec["contract_size"],
+        )
         result = engine.run(body.symbol, candles, body.starting_equity)
 
         sb.table("backtest_runs").update({

@@ -52,6 +52,10 @@ export const api = {
   openOrder: (accountId, payload) => request(`/api/trading/accounts/${accountId}/open`, { method: 'POST', body: payload }),
   closeOrder: (accountId, ticket) => request(`/api/trading/accounts/${accountId}/close/${ticket}`, { method: 'POST' }),
   history: (accountId) => request(`/api/trading/accounts/${accountId}/history`),
+  emergencyStop: (accountId) => request(`/api/trading/accounts/${accountId}/emergency-stop`, { method: 'POST' }),
+  listAutotradeSymbols: (accountId) => request(`/api/trading/accounts/${accountId}/autotrade/symbols`),
+  toggleAutotradeSymbol: (accountId, payload) =>
+    request(`/api/trading/accounts/${accountId}/autotrade/symbols`, { method: 'POST', body: payload }),
 
   // --- risk ---
   presets: () => request('/api/risk/presets'),

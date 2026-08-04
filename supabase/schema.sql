@@ -98,6 +98,8 @@ create table if not exists public.risk_settings (
     news_blackout_minutes     int not null default 15,
     full_margin_mode          boolean not null default false,  -- kalau true & swing tervalidasi -> pakai max_margin_pct_per_trade penuh
     ai_confidence_threshold   numeric(4,2) not null default 0.70,
+    live_autotrade_enabled    boolean not null default false,  -- MASTER SWITCH — harus eksplisit dinyalain user, default OFF
+    last_emergency_stop_at    timestamptz,
     updated_at                timestamptz not null default now()
 );
 
@@ -126,6 +128,22 @@ create table if not exists public.trades (
 );
 create index if not exists idx_trades_account on public.trades(mt5_account_id);
 create index if not exists idx_trades_opened on public.trades(opened_at desc);
+
+-- ----------------------------------------------------------------------------
+-- LIVE AUTOTRADE CONFIGS  (opt-in per akun+simbol untuk eksekusi ASLI.
+-- Dua lapis gate: risk_settings.live_autotrade_enabled (master switch per akun)
+-- HARUS true, DAN row di sini enabled=true, baru scheduler bakal eksekusi
+-- order asli buat kombinasi akun+simbol itu.)
+-- ----------------------------------------------------------------------------
+create table if not exists public.live_autotrade_configs (
+    id              uuid primary key default gen_random_uuid(),
+    mt5_account_id  uuid not null references public.mt5_accounts(id) on delete cascade,
+    symbol          text not null,
+    timeframe       text not null default '15m',
+    enabled         boolean not null default true,
+    created_at      timestamptz not null default now(),
+    unique (mt5_account_id, symbol, timeframe)
+);
 
 -- ----------------------------------------------------------------------------
 -- FORWARD TEST CONFIGS  (on/off per akun+simbol, dipoll APScheduler di backend)
@@ -237,6 +255,9 @@ alter table public.backtest_runs enable row level security;
 alter table public.subscriptions enable row level security;
 alter table public.payments enable row level security;
 alter table public.ai_behavior_profiles enable row level security;
+alter table public.live_autotrade_configs enable row level security;
+alter table public.forward_test_configs enable row level security;
+alter table public.ai_knowledge_base enable row level security;
 
 -- Default: tolak semua akses langsung dari anon key. Semua request HARUS lewat
 -- backend (yang pakai service_role key dan validasi JWT sendiri).

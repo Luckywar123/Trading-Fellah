@@ -1,15 +1,18 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
+import { useEffect, useState, useCallback } from 'react'
 import {
-  Crosshair, LayoutGrid, Target, ShieldAlert, FlaskConical, Newspaper, Wallet, LogOut,
+  Crosshair, LayoutGrid, Target, ShieldAlert, FlaskConical, Bot, Newspaper, Wallet, LogOut,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAccounts } from '../context/AccountContext.jsx'
+import { api } from '../lib/api.js'
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutGrid },
   { to: '/trade', label: 'Trade', icon: Target },
   { to: '/risk', label: 'Risk Settings', icon: ShieldAlert },
   { to: '/backtest', label: 'Backtest', icon: FlaskConical },
+  { to: '/automation', label: 'Automation', icon: Bot },
   { to: '/ai', label: 'AI Insights', icon: Newspaper },
   { to: '/billing', label: 'Billing', icon: Wallet },
 ]
@@ -22,6 +25,38 @@ function shortAddr(addr) {
 export default function Layout({ children }) {
   const { user, logout } = useAuth()
   const { accounts, selectedId, setSelectedId, selected } = useAccounts()
+  const navigate = useNavigate()
+  const [liveOn, setLiveOn] = useState(false)
+  const [stopping, setStopping] = useState(false)
+
+  const checkLiveStatus = useCallback(async () => {
+    if (!selectedId) { setLiveOn(false); return }
+    try {
+      const risk = await api.getRiskSettings(selectedId)
+      setLiveOn(!!risk.live_autotrade_enabled)
+    } catch {
+      setLiveOn(false)
+    }
+  }, [selectedId])
+
+  useEffect(() => {
+    checkLiveStatus()
+    const t = setInterval(checkLiveStatus, 20000)
+    return () => clearInterval(t)
+  }, [checkLiveStatus])
+
+  const handleEmergencyStop = async () => {
+    if (!selectedId) return
+    if (!window.confirm('Matiin auto-trade DAN tutup semua posisi terbuka di akun ini sekarang?')) return
+    setStopping(true)
+    try {
+      await api.emergencyStop(selectedId)
+      setLiveOn(false)
+      navigate('/automation')
+    } finally {
+      setStopping(false)
+    }
+  }
 
   return (
     <div className="min-h-screen flex bg-void text-ink">
@@ -84,15 +119,26 @@ export default function Layout({ children }) {
             </select>
           </div>
           {selected && (
-            <span
-              className={`text-xs font-mono px-2.5 py-1 rounded-full border ${
-                selected.connection_status === 'connected'
-                  ? 'border-long/40 text-long bg-long/10'
-                  : 'border-short/40 text-short bg-short/10'
-              }`}
-            >
-              ● {selected.connection_status?.toUpperCase()}
-            </span>
+            <div className="flex items-center gap-3">
+              {liveOn && (
+                <button
+                  onClick={handleEmergencyStop}
+                  disabled={stopping}
+                  className="text-xs font-mono font-semibold px-3 py-1.5 rounded-full bg-short text-void animate-pulse hover:brightness-110 transition disabled:opacity-60"
+                >
+                  🛑 {stopping ? 'Menghentikan…' : 'LIVE AUTO-TRADE — STOP'}
+                </button>
+              )}
+              <span
+                className={`text-xs font-mono px-2.5 py-1 rounded-full border ${
+                  selected.connection_status === 'connected'
+                    ? 'border-long/40 text-long bg-long/10'
+                    : 'border-short/40 text-short bg-short/10'
+                }`}
+              >
+                ● {selected.connection_status?.toUpperCase()}
+              </span>
+            </div>
           )}
         </header>
         <main className="flex-1 p-6 overflow-y-auto">{children}</main>

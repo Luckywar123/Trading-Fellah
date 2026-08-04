@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { Loader2, FlaskConical, Play, Radio } from 'lucide-react'
+import { Loader2, FlaskConical, Play } from 'lucide-react'
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 import { useAccounts } from '../context/AccountContext.jsx'
 import { api } from '../lib/api.js'
@@ -20,20 +20,11 @@ export default function Backtest() {
   const [busy, setBusy] = useState(false)
   const pollRef = useRef(null)
 
-  const [ftForm, setFtForm] = useState({ symbol: 'EURUSD', timeframe: '15m' })
-  const [ftTrades, setFtTrades] = useState([])
-  const [ftBusy, setFtBusy] = useState(false)
-
   const loadRuns = useCallback(async () => {
     try { setRuns(await api.listBacktests()) } catch { /* ignore */ }
   }, [])
 
-  const loadFtTrades = useCallback(async () => {
-    if (!selected) return
-    try { setFtTrades(await api.forwardTestTrades(selected.id)) } catch { /* ignore */ }
-  }, [selected])
-
-  useEffect(() => { loadRuns(); loadFtTrades() }, [loadRuns, loadFtTrades])
+  useEffect(() => { loadRuns() }, [loadRuns])
   useEffect(() => () => clearInterval(pollRef.current), [])
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
@@ -59,15 +50,6 @@ export default function Backtest() {
     }
   }
 
-  const toggleForwardTest = async (enabled) => {
-    setFtBusy(true)
-    try {
-      await api.toggleForwardTest(selected.id, { ...ftForm, enabled })
-    } finally {
-      setFtBusy(false)
-    }
-  }
-
   if (accounts.length === 0) return <LinkAccountForm />
 
   const summary = run?.result_summary
@@ -76,8 +58,12 @@ export default function Backtest() {
   return (
     <div className="space-y-6">
       <h1 className="font-display text-xl font-semibold flex items-center gap-2">
-        <FlaskConical size={20} className="text-amber" /> Backtest &amp; Forward Test
+        <FlaskConical size={20} className="text-amber" /> Backtest
       </h1>
+      <p className="text-sm text-ink-muted -mt-4">
+        Replay data historis pakai logic yang sama persis dengan live/forward test.
+        Buat nyalain forward test (paper) atau live auto-trade, ke halaman <strong>Automation</strong>.
+      </p>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <form onSubmit={submit} className="panel p-5 space-y-3 h-fit">
@@ -104,19 +90,22 @@ export default function Backtest() {
             {busy ? 'Menjalankan…' : 'Run Backtest'}
           </button>
 
-          <div className="pt-4 mt-2 border-t border-line space-y-3">
-            <div className="text-sm font-semibold flex items-center gap-1.5"><Radio size={14} className="text-cyan" /> Forward Test (live, paper)</div>
-            <Select label="Symbol" value={ftForm.symbol} onChange={(e) => setFtForm((f) => ({ ...f, symbol: e.target.value }))} options={SYMBOLS} />
-            <Select label="Timeframe" value={ftForm.timeframe} onChange={(e) => setFtForm((f) => ({ ...f, timeframe: e.target.value }))} options={TIMEFRAMES} />
-            <div className="grid grid-cols-2 gap-2">
-              <button type="button" disabled={ftBusy} onClick={() => toggleForwardTest(true)} className="py-2 rounded-md text-xs font-semibold border border-long/40 text-long bg-long/10 hover:bg-long/20 transition">Nyalakan</button>
-              <button type="button" disabled={ftBusy} onClick={() => toggleForwardTest(false)} className="py-2 rounded-md text-xs font-semibold border border-line text-ink-muted hover:border-short hover:text-short transition">Matikan</button>
+          {runs.length > 0 && (
+            <div className="pt-3 mt-2 border-t border-line">
+              <div className="text-[11px] uppercase tracking-widest text-ink-faint font-mono mb-2">Histori Run</div>
+              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                {runs.map((r) => (
+                  <button key={r.id} onClick={() => setRun(r)}
+                    className="w-full text-left text-xs font-mono px-2.5 py-1.5 rounded-md hover:bg-raised transition flex justify-between">
+                    <span>{r.symbol} · {r.timeframe}</span>
+                    <span className={r.result_summary?.net_pnl >= 0 ? 'text-long' : 'text-short'}>
+                      {r.status === 'done' ? `$${r.result_summary?.net_pnl ?? 0}` : r.status}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
-            <p className="text-[11px] text-ink-faint leading-relaxed">
-              Jalan pakai harga real-time MT5, tapi order cuma dicatat (paper) — gak pernah kirim order asli.
-              Sistem cek tiap 5 menit lewat scheduler backend.
-            </p>
-          </div>
+          )}
         </form>
 
         <div className="lg:col-span-2 space-y-4">
@@ -131,9 +120,9 @@ export default function Backtest() {
           {summary?.error && <div className="panel border-short/40 bg-short/10 p-3 text-sm text-short">{summary.error}</div>}
 
           <div className="panel p-5">
-            <div className="text-[11px] uppercase tracking-[0.15em] text-ink-muted font-mono mb-3">Equity Curve (Backtest)</div>
+            <div className="text-[11px] uppercase tracking-[0.15em] text-ink-muted font-mono mb-3">Equity Curve</div>
             {curve.length > 1 ? (
-              <ResponsiveContainer width="100%" height={260}>
+              <ResponsiveContainer width="100%" height={300}>
                 <AreaChart data={curve}>
                   <defs>
                     <linearGradient id="btEq" x1="0" y1="0" x2="0" y2="1">
@@ -149,32 +138,9 @@ export default function Backtest() {
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-[260px] flex items-center justify-center text-sm text-ink-faint font-mono">
+              <div className="h-[300px] flex items-center justify-center text-sm text-ink-faint font-mono">
                 {busy ? 'Menjalankan backtest…' : 'Belum ada hasil — jalankan backtest di sebelah kiri'}
               </div>
-            )}
-          </div>
-
-          <div className="panel p-5">
-            <div className="text-[11px] uppercase tracking-[0.15em] text-ink-muted font-mono mb-3">Forward Test Trades (paper, terbaru)</div>
-            {ftTrades.length === 0 ? (
-              <p className="text-sm text-ink-faint py-4">Belum ada trade forward test.</p>
-            ) : (
-              <table className="w-full text-sm font-mono">
-                <tbody>
-                  {ftTrades.slice(0, 10).map((t) => (
-                    <tr key={t.id} className="border-b border-line/50">
-                      <td className="py-2">{t.symbol}</td>
-                      <td className={t.direction === 'LONG' ? 'text-long' : 'text-short'}>{t.direction}</td>
-                      <td className="text-ink-muted">{t.source}</td>
-                      <td className="text-ink-muted">{new Date(t.opened_at).toLocaleString('id-ID')}</td>
-                      <td className={`text-right ${t.pnl_usd >= 0 ? 'text-long' : 'text-short'}`}>
-                        {t.pnl_usd != null ? `${t.pnl_usd >= 0 ? '+' : ''}$${t.pnl_usd}` : 'open'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             )}
           </div>
         </div>

@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 
 from backend.services.swing_detector import Candle, SwingDetector
 from backend.services.risk_manager import calculate_position_size
+from backend.services.signal_engine import compute_atr, find_validated_signal
 
 
 @dataclass
@@ -66,7 +67,7 @@ class BacktestEngine:
 
         for i in range(self.lookback, len(candles)):
             window = candles[max(0, i - self.lookback):i + 1]
-            atr = self._atr(window)
+            atr = compute_atr(window)
 
             # --- kelola posisi terbuka ---
             if open_trade:
@@ -95,8 +96,7 @@ class BacktestEngine:
 
             # --- cari sinyal baru kalau lagi flat ---
             if not open_trade and atr > 0:
-                analysis = self.detector.analyze(window)
-                signal = self._find_signal(window, analysis, atr)
+                signal = find_validated_signal(self.detector, window, self.risk_cfg)
                 if signal:
                     entry_price = candles[i].close + (self.spread if signal["direction"] == "LONG" else -self.spread)
                     sl = self._stop_loss(entry_price, signal["direction"], atr)
@@ -126,39 +126,10 @@ class BacktestEngine:
         return self._summarize(trades, curve, starting_equity, equity)
 
     # ------------------------------------------------------------------ #
-    def _find_signal(self, window: list[Candle], analysis, atr: float) -> dict | None:
-        last_price = window[-1].close
-        candidates = []
-
-        for ob in analysis.order_blocks:
-            level = ob.zone_high if ob.direction == "LONG" else ob.zone_low
-            v = self.detector.validate_breakout(window, level, ob.direction, atr)
-            if v["validated"] and v["confidence"] >= self.risk_cfg["ai_confidence_threshold"]:
-                candidates.append({"direction": ob.direction, "type": "order_block", "confidence": v["confidence"]})
-
-        for zone in analysis.zones:
-            level = zone.high if zone.kind == "resistance" else zone.low
-            direction = "LONG" if zone.kind == "resistance" else "SHORT"  # breakout arah zona ditembus
-            v = self.detector.validate_breakout(window, level, direction, atr)
-            if v["validated"] and v["confidence"] >= self.risk_cfg["ai_confidence_threshold"]:
-                candidates.append({"direction": direction, "type": "support_resistance", "confidence": v["confidence"]})
-
-        if not candidates:
-            return None
-        return max(candidates, key=lambda c: c["confidence"])
 
     def _stop_loss(self, entry: float, direction: str, atr: float) -> float:
         dist = atr * self.risk_cfg["sl_atr_multiplier"]
         return entry - dist if direction == "LONG" else entry + dist
-
-    def _atr(self, window: list[Candle], period: int = 14) -> float:
-        if len(window) < period + 1:
-            return 0.0
-        trs = []
-        for i in range(1, len(window)):
-            h, l, pc = window[i].high, window[i].low, window[i - 1].close
-            trs.append(max(h - l, abs(h - pc), abs(l - pc)))
-        return sum(trs[-period:]) / period
 
     def _profit_pips(self, trade: BacktestTrade, price: float, pip: float) -> float:
         if trade.direction == "LONG":

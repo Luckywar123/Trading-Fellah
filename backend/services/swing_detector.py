@@ -135,35 +135,66 @@ class SwingDetector:
         return major
 
     # ------------------------------------------------------------------ #
-    def _find_order_blocks(self, candles: list[Candle], swing_highs, swing_lows) -> list[OrderBlock]:
-        obs = []
-        sh_idx = {p["index"] for p in swing_highs}
-        sl_idx = {p["index"] for p in swing_lows}
+    def _find_order_blocks(self, candles: list[Candle], swing_highs, swing_lows,
+                            max_lookback: int = 10) -> list[OrderBlock]:
+        """
+        BUG YANG DIPERBAIKI: versi awal mensyaratkan candle turun (calon order
+        block) ADA PERSIS SEBELAH candle yang menembus swing high — di data
+        trending yang halus, dua kondisi itu nyaris gak pernah jatuh di candle
+        yang sama (butuh beberapa candle momentum dulu sebelum harga beneran
+        nembus level lama), jadi order block nyaris gak pernah kedeteksi sama
+        sekali (diverifikasi lewat smoke test, 0 dari 500 bar trending bersih).
 
-        for i in range(2, len(candles) - 1):
+        Definisi yang benar: order block = candle berlawanan warna TERAKHIR
+        SEBELUM leg impulsif yang berujung ke break of structure — bukan
+        harus persis 1 candle sebelum candle BOS-nya. Sekarang jalan dari
+        candle BOS mundur (maks `max_lookback` bar) buat nemuin candle
+        berlawanan warna itu.
+        """
+        obs = []
+        seen_index = set()
+
+        for i in range(1, len(candles) - 1):
             c = candles[i]
-            prev = candles[i - 1]
             is_bull_impulse = c.close > c.open and (c.close - c.open) > (c.high - c.low) * 0.5
             is_bear_impulse = c.close < c.open and (c.open - c.close) > (c.high - c.low) * 0.5
 
-            # Bullish OB: candle turun terakhir sebelum impulsive naik yang break swing high sebelumnya
-            if is_bull_impulse and prev.close < prev.open:
+            if is_bull_impulse:
                 recent_highs = [p["price"] for p in swing_highs if p["index"] < i]
                 if recent_highs and c.close > recent_highs[-1]:
-                    obs.append(OrderBlock(
-                        index=i - 1, direction="LONG",
-                        zone_low=prev.low, zone_high=prev.open, formed_at=prev.time,
-                    ))
+                    j = self._last_opposite_candle(candles, i, max_lookback, want_down=True)
+                    if j is not None and j not in seen_index:
+                        seen_index.add(j)
+                        ob_candle = candles[j]
+                        obs.append(OrderBlock(index=j, direction="LONG",
+                                               zone_low=ob_candle.low, zone_high=ob_candle.open,
+                                               formed_at=ob_candle.time))
 
-            # Bearish OB: candle naik terakhir sebelum impulsive turun yang break swing low sebelumnya
-            if is_bear_impulse and prev.close > prev.open:
+            if is_bear_impulse:
                 recent_lows = [p["price"] for p in swing_lows if p["index"] < i]
                 if recent_lows and c.close < recent_lows[-1]:
-                    obs.append(OrderBlock(
-                        index=i - 1, direction="SHORT",
-                        zone_low=prev.open, zone_high=prev.high, formed_at=prev.time,
-                    ))
+                    j = self._last_opposite_candle(candles, i, max_lookback, want_down=False)
+                    if j is not None and j not in seen_index:
+                        seen_index.add(j)
+                        ob_candle = candles[j]
+                        obs.append(OrderBlock(index=j, direction="SHORT",
+                                               zone_low=ob_candle.open, zone_high=ob_candle.high,
+                                               formed_at=ob_candle.time))
+        obs.sort(key=lambda o: o.index)
         return obs
+
+    @staticmethod
+    def _last_opposite_candle(candles: list[Candle], upto_index: int, max_lookback: int, want_down: bool) -> int | None:
+        """Jalan mundur dari `upto_index` (gak termasuk) sampai `max_lookback` bar,
+        cari candle turun (want_down=True) atau naik (want_down=False) terakhir."""
+        floor = max(0, upto_index - max_lookback)
+        for j in range(upto_index - 1, floor - 1, -1):
+            is_down = candles[j].close < candles[j].open
+            if want_down and is_down:
+                return j
+            if not want_down and not is_down:
+                return j
+        return None
 
     # ------------------------------------------------------------------ #
     def _trend(self, swing_highs, swing_lows) -> tuple[str, float]:

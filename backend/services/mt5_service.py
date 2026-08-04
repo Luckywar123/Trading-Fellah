@@ -146,5 +146,39 @@ async def get_historical_candles(metaapi_account_id: str, symbol: str,
     return candles
 
 
+async def get_symbol_spec(metaapi_account_id: str, symbol: str) -> dict:
+    """
+    Ambil spesifikasi kontrak ASLI dari broker (bukan angka forex standar
+    yang di-hardcode) — penting buat XAUUSD, pair yang ada JPY-nya, crypto,
+    index, dst yang beda jauh dari forex mayor biasa.
+
+    pip_size disimpulkan dari jumlah digit harga (konvensi umum broker MT4/5):
+    5 atau 3 digit -> pip = 10 x point; 4 atau 2 digit -> pip = 1 x point.
+    pip_value_per_lot dihitung dari tickValue broker (paling akurat).
+    """
+    conn = await _get_connection(metaapi_account_id)
+    spec = await conn.get_symbol_specification(symbol)
+    price = await conn.get_symbol_price(symbol)
+
+    digits = spec.get("digits", 5)
+    point = spec.get("point") or (10 ** -digits)
+    pip_size = point * 10 if digits in (3, 5) else point
+
+    tick_size = spec.get("tickSize", point)
+    tick_value = spec.get("tickValue", 1.0)
+    pip_value_per_lot = tick_value * (pip_size / tick_size) if tick_size else tick_value
+
+    return {
+        "symbol": symbol,
+        "contract_size": spec.get("contractSize", 100_000),
+        "digits": digits,
+        "pip_size": pip_size,
+        "pip_value_per_lot": pip_value_per_lot,
+        "min_volume": spec.get("minVolume", 0.01),
+        "volume_step": spec.get("volumeStep", 0.01),
+        "current_price": price.get("bid") if price else None,
+    }
+
+
 def decrypt_password(encrypted_password: str) -> str:
     return get_cipher().decrypt(encrypted_password)

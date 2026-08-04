@@ -41,6 +41,7 @@ class RiskSettingsUpdate(BaseModel):
     news_blackout_minutes: int | None = None
     full_margin_mode: bool | None = None
     ai_confidence_threshold: float | None = None
+    live_autotrade_enabled: bool | None = None
 
 
 class BacktestRequest(BaseModel):

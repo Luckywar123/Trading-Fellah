@@ -10,6 +10,7 @@ Swagger docs otomatis di http://localhost:8000/docs — enak buat ngetes
 semua endpoint sebelum frontend selesai.
 """
 import logging
+from datetime import datetime, timezone
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
@@ -23,6 +24,7 @@ from backend.routers import (
 )
 from backend.services import news_service
 from backend.services.forward_test import run_forward_test_cycle
+from backend.services.live_autotrader import run_live_autotrade_cycle
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("trading-fellah")
@@ -75,16 +77,63 @@ async def scheduled_forward_test():
         sb = get_supabase()
         configs = sb.table("forward_test_configs").select("*").eq("enabled", True).execute().data
         for cfg in configs:
+            account_res = sb.table("mt5_accounts").select("*").eq("id", cfg["mt5_account_id"]).execute()
             risk_res = sb.table("risk_settings").select("*") \
                 .eq("mt5_account_id", cfg["mt5_account_id"]).execute()
-            if not risk_res.data:
+            if not account_res.data or not risk_res.data:
+                continue
+            account = account_res.data[0]
+            if not account.get("metaapi_account_id"):
                 continue
             result = await run_forward_test_cycle(
-                cfg["mt5_account_id"], cfg["symbol"], cfg["timeframe"], risk_res.data[0]
+                cfg["mt5_account_id"], account["metaapi_account_id"], cfg["symbol"], cfg["timeframe"], risk_res.data[0]
             )
             logger.info(f"Forward test {cfg['symbol']}: {result}")
     except Exception as e:
         logger.error(f"Forward test cycle gagal: {e}")
+
+
+@scheduler.scheduled_job("interval", minutes=5)
+async def scheduled_live_autotrade():
+    """
+    LAPIS 1 (query filter): cuma ambil config yang enabled=true DAN akun yang
+    risk_settings.live_autotrade_enabled=true. LAPIS 2 (di dalam
+    run_live_autotrade_cycle): dicek ulang sebelum kirim order — jaga-jaga
+    kalau ada race condition antara scheduler baca config vs user matiin
+    switch di tengah siklus.
+    """
+    try:
+        sb = get_supabase()
+        configs = sb.table("live_autotrade_configs").select("*").eq("enabled", True).execute().data
+        for cfg in configs:
+            account_res = sb.table("mt5_accounts").select("*").eq("id", cfg["mt5_account_id"]).execute()
+            risk_res = sb.table("risk_settings").select("*").eq("mt5_account_id", cfg["mt5_account_id"]).execute()
+            if not account_res.data or not risk_res.data:
+                continue
+            account = account_res.data[0]
+            risk_cfg = risk_res.data[0]
+            if not risk_cfg.get("live_autotrade_enabled") or not account.get("metaapi_account_id"):
+                continue
+            result = await run_live_autotrade_cycle(
+                cfg["mt5_account_id"], account["metaapi_account_id"], cfg["symbol"], cfg["timeframe"], risk_cfg,
+            )
+            logger.info(f"Live autotrade {cfg['symbol']} (akun {cfg['mt5_account_id']}): {result}")
+    except Exception as e:
+        logger.error(f"Live autotrade cycle gagal: {e}")
+
+
+@scheduler.scheduled_job("interval", hours=1)
+async def scheduled_subscription_expiry():
+    try:
+        sb = get_supabase()
+        now = datetime.now(timezone.utc).isoformat()
+        expired = sb.table("subscriptions").select("id").eq("status", "active").lt("current_period_end", now).execute()
+        for row in expired.data or []:
+            sb.table("subscriptions").update({"status": "expired"}).eq("id", row["id"]).execute()
+        if expired.data:
+            logger.info(f"{len(expired.data)} subscription di-expire-kan.")
+    except Exception as e:
+        logger.error(f"Subscription expiry check gagal: {e}")
 
 
 @app.on_event("startup")
