@@ -1,0 +1,22 @@
+# Backend (deploy ini terpisah ke Railway/Render, bukan Vercel)
+backend/
+
+# Kode trading-bot lama di root (bukan bagian dari web app)
+src/
+config/
+database.py
+requirements.txt
+scripts/
+supabase/
+
+# Folder legacy/duplikat, gak kepake app yang sekarang
+web/
+
+# Virtualenv Python — HARUSNYA udah di .gitignore, tapi kalau kepush jangan
+# sampai ikut ke-scan/upload ke Vercel
+.venv/
+venv/
+
+# Docs, gak perlu ikut deploy
+DEPLOYMENT.md
+docker-compose.yml

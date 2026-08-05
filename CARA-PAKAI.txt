@@ -1,0 +1,41 @@
+CARA PAKAI
+==========
+
+1. Extract rar ini.
+2. Copy KEDUA file (vercel.json dan .vercelignore) ke folder ROOT
+   project kamu — sejajar sama folder backend/, frontend/, dan file
+   docker-compose.yml. Kalau di root udah ada vercel.json, timpa aja.
+
+   Struktur akhirnya:
+   Trading-Fellah/
+   ├── vercel.json          <- dari rar ini
+   ├── .vercelignore        <- dari rar ini
+   ├── backend/
+   ├── frontend/
+   ├── docker-compose.yml
+   └── ...
+
+3. Commit & push:
+   git add vercel.json .vercelignore
+   git commit -m "fix: scope vercel build to frontend only"
+   git push
+
+4. Redeploy di Vercel (biasanya auto-trigger begitu ke-push). Kali ini
+   Vercel gak akan nyoba deteksi Python lagi — dia langsung build folder
+   frontend/ pakai Vite, karena "framework": "vite" di vercel.json
+   ini override deteksi otomatisnya.
+
+5. Jangan lupa isi environment variable VITE_API_URL di Vercel project
+   settings, isinya URL backend kamu nanti (dari Railway/Render).
+
+CATATAN
+-------
+- Ini gak ganti Root Directory di dashboard Vercel — kamu gak perlu
+  klak-klik apa-apa lagi di sana, cukup 2 file ini.
+- Ketauan juga pas aku cek repo: folder .venv/ (virtualenv Python) ke-
+  commit ke git padahal harusnya udah di-ignore. .vercelignore ini
+  udah nutup itu buat sisi Vercel, tapi kalau mau beresin dari git-nya
+  juga (biar repo gak bengkak), jalanin:
+    git rm -r --cached .venv
+    git commit -m "chore: stop tracking .venv"
+    git push
