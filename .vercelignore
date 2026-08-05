@@ -1,22 +1,25 @@
-# Backend (deploy ini terpisah ke Railway/Render, bukan Vercel)
-backend/
+# Semua pattern di-anchor ke ROOT repo (pakai leading "/") biar gak
+# ketimpa ke folder senama di dalam frontend/ (misal frontend/src/).
+
+# Backend (deploy terpisah ke Railway/Render, bukan Vercel)
+/backend/
 
 # Kode trading-bot lama di root (bukan bagian dari web app)
-src/
-config/
-database.py
-requirements.txt
-scripts/
-supabase/
+/src/
+/config/
+/database.py
+/requirements.txt
+/scripts/
+/supabase/
 
 # Folder legacy/duplikat, gak kepake app yang sekarang
-web/
+/web/
 
-# Virtualenv Python — HARUSNYA udah di .gitignore, tapi kalau kepush jangan
-# sampai ikut ke-scan/upload ke Vercel
-.venv/
-venv/
+# Virtualenv Python — harusnya udah di .gitignore, tapi kalau kepush
+# jangan sampai ikut ke-scan Vercel
+/.venv/
+/venv/
 
-# Docs, gak perlu ikut deploy
-DEPLOYMENT.md
-docker-compose.yml
+# Docs & compose file, gak perlu ikut deploy
+/DEPLOYMENT.md
+/docker-compose.yml

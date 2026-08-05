@@ -1,41 +1,45 @@
-CARA PAKAI
-==========
+CARA PAKAI (v2 - revisi)
+=========================
 
-1. Extract rar ini.
-2. Copy KEDUA file (vercel.json dan .vercelignore) ke folder ROOT
-   project kamu — sejajar sama folder backend/, frontend/, dan file
-   docker-compose.yml. Kalau di root udah ada vercel.json, timpa aja.
+Ini revisi dari rar sebelumnya. Ada 2 bug yang dibenerin:
+1. .vercelignore kemarin bisa ikut ngehapus frontend/src/ (source code
+   React kamu) — sekarang semua pattern-nya di-anchor ke root pakai "/"
+   di depan, jadi cuma kena folder/file di ROOT repo aja.
+2. vercel.json sekarang ditaruh DI DALAM folder frontend/, bukan di
+   root lagi — soalnya Root Directory project kamu di Vercel dashboard
+   kelihatannya udah ke-set ke "frontend".
+
+LANGKAH:
+
+1. Buka Vercel dashboard -> project Trading-Fellah -> Settings ->
+   General -> cek "Root Directory". PASTIKAN isinya "frontend"
+   (kalau belum, set ke "frontend" terus Save).
+
+2. HAPUS vercel.json yang lama di ROOT repo kamu (dari rar sebelumnya).
+   git rm vercel.json
+
+3. Extract rar ini, lalu copy:
+   - frontend/vercel.json  -> masuk ke folder frontend/ project kamu
+     (timpa kalau udah ada)
+   - .vercelignore         -> tetap di ROOT project kamu (timpa yang lama)
 
    Struktur akhirnya:
    Trading-Fellah/
-   ├── vercel.json          <- dari rar ini
-   ├── .vercelignore        <- dari rar ini
-   ├── backend/
-   ├── frontend/
-   ├── docker-compose.yml
-   └── ...
+   |-- .vercelignore        <- dari rar ini (versi baru)
+   |-- backend/
+   |-- frontend/
+   |   `-- vercel.json      <- dari rar ini (lokasi baru)
+   |-- docker-compose.yml
+   `-- ...
 
-3. Commit & push:
-   git add vercel.json .vercelignore
-   git commit -m "fix: scope vercel build to frontend only"
+4. Commit & push:
+   git add -A
+   git commit -m "fix: move vercel.json into frontend/, anchor vercelignore to root"
    git push
 
-4. Redeploy di Vercel (biasanya auto-trigger begitu ke-push). Kali ini
-   Vercel gak akan nyoba deteksi Python lagi — dia langsung build folder
-   frontend/ pakai Vite, karena "framework": "vite" di vercel.json
-   ini override deteksi otomatisnya.
+5. Redeploy. Karena Root Directory udah "frontend", Vercel otomatis
+   jalanin npm install & vite build di dalam folder itu tanpa perlu
+   custom buildCommand lagi — jadi gak ada lagi "cd frontend" dobel.
 
-5. Jangan lupa isi environment variable VITE_API_URL di Vercel project
-   settings, isinya URL backend kamu nanti (dari Railway/Render).
-
-CATATAN
--------
-- Ini gak ganti Root Directory di dashboard Vercel — kamu gak perlu
-  klak-klik apa-apa lagi di sana, cukup 2 file ini.
-- Ketauan juga pas aku cek repo: folder .venv/ (virtualenv Python) ke-
-  commit ke git padahal harusnya udah di-ignore. .vercelignore ini
-  udah nutup itu buat sisi Vercel, tapi kalau mau beresin dari git-nya
-  juga (biar repo gak bengkak), jalanin:
-    git rm -r --cached .venv
-    git commit -m "chore: stop tracking .venv"
-    git push
+6. Isi env var VITE_API_URL di Vercel project settings dengan URL
+   backend kamu (dari Railway/Render).
