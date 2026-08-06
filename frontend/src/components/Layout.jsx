@@ -8,7 +8,7 @@ import { useAccounts } from '../context/AccountContext.jsx'
 import { api } from '../lib/api.js'
 
 const NAV = [
-  { to: '/', label: 'Dashboard', icon: LayoutGrid },
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutGrid },
   { to: '/trade', label: 'Trade', icon: Target },
   { to: '/risk', label: 'Risk Settings', icon: ShieldAlert },
   { to: '/backtest', label: 'Backtest', icon: FlaskConical },
@@ -72,7 +72,7 @@ export default function Layout({ children }) {
             <NavLink
               key={to}
               to={to}
-              end={to === '/'}
+              end={to === '/dashboard'}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors focus-ring ${
                   isActive

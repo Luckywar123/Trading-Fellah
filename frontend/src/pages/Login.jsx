@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Crosshair, Loader2 } from 'lucide-react'
+import { useNavigate, Link } from 'react-router-dom'
+import { Crosshair, Loader2, ArrowLeft } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { isWalletAvailable } from '../lib/wallet.js'
 
@@ -13,7 +13,7 @@ export default function Login() {
     setBusy(true)
     try {
       await login()
-      navigate('/')
+      navigate('/dashboard')
     } catch {
       /* error sudah dipegang di AuthContext */
     } finally {
@@ -35,6 +35,9 @@ export default function Login() {
       </div>
 
       <div className="relative w-full max-w-sm">
+        <Link to="/" className="flex items-center gap-1.5 text-xs text-ink-faint hover:text-ink-muted mb-6 transition">
+          <ArrowLeft size={13} /> Kembali
+        </Link>
         <div className="flex items-center gap-2.5 justify-center mb-8">
           <Crosshair size={26} className="text-amber" strokeWidth={1.5} />
           <span className="font-display font-semibold text-lg tracking-tight">TRADING FELLAH</span>

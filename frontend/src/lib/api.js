@@ -83,6 +83,8 @@ export const api = {
   // --- billing ---
   billingStatus: () => request('/api/billing/status'),
   checkout: (payload) => request('/api/billing/checkout', { method: 'POST', body: payload }),
+  checkoutQris: (payload) => request('/api/billing/checkout-qris', { method: 'POST', body: payload }),
+  qrisStatus: (orderId) => request(`/api/billing/qris-status/${orderId}`, { method: 'GET' }),
   payments: () => request('/api/billing/payments'),
 }
 

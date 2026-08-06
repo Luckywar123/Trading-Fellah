@@ -52,5 +52,15 @@ class Settings(BaseSettings):
     PLAN_PRICE_PRO: float = 79.0
     PLAN_PRICE_ELITE: float = 199.0
 
+    # --- Payments: Midtrans (QRIS, https://midtrans.com) ---
+    # QRIS cuma bisa diterbitkan lewat PJP resmi berizin BI — Midtrans salah
+    # satu yang paling umum. Charge-nya jalan di IDR, bukan USD, jadi harga
+    # plan didefinisikan terpisah di bawah (samain manual sama kurs kamu).
+    MIDTRANS_SERVER_KEY: str = ""
+    MIDTRANS_IS_PRODUCTION: bool = False
+    PLAN_PRICE_BASIC_IDR: int = 470_000
+    PLAN_PRICE_PRO_IDR: int = 1_270_000
+    PLAN_PRICE_ELITE_IDR: int = 3_190_000
+
 
 settings = Settings()

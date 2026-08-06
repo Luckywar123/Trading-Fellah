@@ -60,6 +60,10 @@ class CheckoutRequest(BaseModel):
     cancel_url: str
 
 
+class CheckoutQrisRequest(BaseModel):
+    plan: str = Field(..., pattern="^(basic|pro|elite)$")
+
+
 class KnowledgeItemRequest(BaseModel):
     title: str
     content: str

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Check, Loader2, Wallet } from 'lucide-react'
+import { Check, Loader2, Wallet, QrCode } from 'lucide-react'
 import { api } from '../lib/api.js'
+import QrisModal from '../components/QrisModal.jsx'
 
 const PLANS = [
   { key: 'basic', name: 'Basic', price: 29, features: ['1 akun MT5', 'Manual trading + dashboard', 'Backtest terbatas'] },
@@ -8,19 +9,26 @@ const PLANS = [
   { key: 'elite', name: 'Elite', price: 199, features: ['Akun MT5 tanpa batas', 'Full margin mode', 'Behavior profiling AI', 'Priority support'] },
 ]
 
+function formatIDR(n) {
+  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n)
+}
+
 export default function Billing() {
   const [status, setStatus] = useState(null)
   const [payments, setPayments] = useState([])
-  const [busyPlan, setBusyPlan] = useState(null)
+  const [busy, setBusy] = useState(null) // `${plan}:${method}` pas lagi proses
   const [err, setErr] = useState(null)
+  const [qrisCharge, setQrisCharge] = useState(null)
 
-  useEffect(() => {
+  const refresh = () => {
     api.billingStatus().then(setStatus).catch(() => {})
     api.payments().then(setPayments).catch(() => {})
-  }, [])
+  }
 
-  const subscribe = async (plan) => {
-    setBusyPlan(plan)
+  useEffect(refresh, [])
+
+  const payWithCrypto = async (plan) => {
+    setBusy(`${plan}:crypto`)
     setErr(null)
     try {
       const { invoice_url } = await api.checkout({
@@ -31,7 +39,20 @@ export default function Billing() {
       window.location.href = invoice_url
     } catch (e) {
       setErr(e.message)
-      setBusyPlan(null)
+      setBusy(null)
+    }
+  }
+
+  const payWithQris = async (plan) => {
+    setBusy(`${plan}:qris`)
+    setErr(null)
+    try {
+      const charge = await api.checkoutQris({ plan })
+      setQrisCharge(charge)
+    } catch (e) {
+      setErr(e.message)
+    } finally {
+      setBusy(null)
     }
   }
 
@@ -64,18 +85,32 @@ export default function Billing() {
                 </li>
               ))}
             </ul>
-            <button onClick={() => subscribe(p.key)} disabled={busyPlan === p.key}
-              className="mt-5 w-full bg-amber text-void font-semibold text-sm rounded-md py-2.5 flex items-center justify-center gap-2 hover:brightness-110 transition disabled:opacity-60">
-              {busyPlan === p.key ? <Loader2 size={14} className="animate-spin" /> : null}
-              {busyPlan === p.key ? 'Membuat invoice…' : 'Bayar dengan Crypto'}
-            </button>
+
+            <div className="mt-5 space-y-2">
+              <button
+                onClick={() => payWithCrypto(p.key)}
+                disabled={busy !== null}
+                className="w-full bg-amber text-void font-semibold text-sm rounded-md py-2.5 flex items-center justify-center gap-2 hover:brightness-110 transition disabled:opacity-60"
+              >
+                {busy === `${p.key}:crypto` ? <Loader2 size={14} className="animate-spin" /> : <Wallet size={14} />}
+                {busy === `${p.key}:crypto` ? 'Membuat invoice…' : 'Bayar Crypto'}
+              </button>
+              <button
+                onClick={() => payWithQris(p.key)}
+                disabled={busy !== null}
+                className="w-full border border-line text-ink font-semibold text-sm rounded-md py-2.5 flex items-center justify-center gap-2 hover:bg-raised transition disabled:opacity-60"
+              >
+                {busy === `${p.key}:qris` ? <Loader2 size={14} className="animate-spin" /> : <QrCode size={14} />}
+                {busy === `${p.key}:qris` ? 'Menyiapkan QR…' : 'Bayar QRIS'}
+              </button>
+            </div>
           </div>
         ))}
       </div>
       <p className="text-xs text-ink-faint">
-        Pembayaran diproses NOWPayments (crypto invoice) — kamu akan diarahkan ke halaman checkout mereka,
-        pilih koin (BTC/ETH/USDT/dll), scan/kirim ke alamat yang diberikan. Membership aktif otomatis begitu
-        pembayaran confirmed di blockchain.
+        <strong>Crypto</strong>: diproses NOWPayments — diarahkan ke halaman checkout mereka, pilih koin
+        (BTC/ETH/USDT/dll), scan/kirim ke alamat yang diberikan. <strong>QRIS</strong>: scan langsung dari
+        GoPay/OVO/DANA/ShopeePay/m-banking. Kedua metode aktifin membership otomatis begitu pembayaran confirmed.
       </p>
 
       <div className="panel p-5">
@@ -88,7 +123,7 @@ export default function Billing() {
               {payments.map((p) => (
                 <tr key={p.id} className="border-b border-line/50">
                   <td className="py-2">{p.plan?.toUpperCase()}</td>
-                  <td className="text-ink-muted">${p.amount_usd}</td>
+                  <td className="text-ink-muted">{p.pay_currency === 'QRIS' ? formatIDR(p.amount_usd) : `$${p.amount_usd}`}</td>
                   <td className="text-ink-muted">{p.pay_currency || '-'}</td>
                   <td className={p.status === 'finished' ? 'text-long' : 'text-ink-muted'}>{p.status}</td>
                   <td className="text-ink-faint text-xs">{new Date(p.created_at).toLocaleString('id-ID')}</td>
@@ -98,6 +133,14 @@ export default function Billing() {
           </table>
         )}
       </div>
+
+      {qrisCharge && (
+        <QrisModal
+          charge={qrisCharge}
+          onClose={() => { setQrisCharge(null); refresh() }}
+          onPaid={refresh}
+        />
+      )}
     </div>
   )
 }
