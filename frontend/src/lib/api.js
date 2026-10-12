@@ -1,4 +1,10 @@
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/+$/, '')
+
+// Penyebab klasik "deploy jalan tapi semua request gagal": VITE_API_URL lupa di-set
+// di Vercel, jadi build production nembak ke localhost. Kasih peringatan jelas di console.
+if (import.meta.env.PROD && BASE_URL.includes('localhost')) {
+  console.error('[Trading Fellah] VITE_API_URL belum di-set di environment build — API menunjuk ke localhost.')
+}
 
 function getToken() {
   return localStorage.getItem('tf_token')
@@ -79,6 +85,7 @@ export const api = {
   latestBehavior: () => request('/api/ai/behavior/latest'),
   listKnowledge: () => request('/api/ai/knowledge'),
   addKnowledge: (payload) => request('/api/ai/knowledge', { method: 'POST', body: payload }),
+  chat: (message, history = []) => request('/api/ai/chat', { method: 'POST', body: { message, history } }),
 
   // --- billing ---
   billingStatus: () => request('/api/billing/status'),

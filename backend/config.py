@@ -13,6 +13,12 @@ class Settings(BaseSettings):
     APP_NAME: str = "Trading Fellah"
     ENV: str = "development"                 # development | production
     FRONTEND_ORIGIN: str = "http://localhost:5173"
+    # Origin tambahan (pisah koma), misal domain custom + domain vercel:
+    #   CORS_EXTRA_ORIGINS=https://trading-fellah.vercel.app,https://app.domainkamu.com
+    CORS_EXTRA_ORIGINS: str = ""
+    # Regex opsional buat preview deployment Vercel, contoh:
+    #   CORS_ORIGIN_REGEX=https://trading-fellah.*\\.vercel\\.app
+    CORS_ORIGIN_REGEX: str = ""
 
     # --- Auth / JWT (session token setelah wallet login berhasil) ---
     JWT_SECRET: str = "CHANGE_ME_dev_only_insecure_secret"
@@ -61,6 +67,23 @@ class Settings(BaseSettings):
     PLAN_PRICE_BASIC_IDR: int = 470_000
     PLAN_PRICE_PRO_IDR: int = 1_270_000
     PLAN_PRICE_ELITE_IDR: int = 3_190_000
+
+
+    @property
+    def cors_origins(self) -> list[str]:
+        raw = [self.FRONTEND_ORIGIN, *self.CORS_EXTRA_ORIGINS.split(",")]
+        return sorted({o.strip().rstrip("/") for o in raw if o.strip()})
+
+    def validate_for_production(self) -> list[str]:
+        """Return daftar masalah config yang fatal kalau ENV=production."""
+        problems = []
+        if self.JWT_SECRET.startswith("CHANGE_ME") or len(self.JWT_SECRET) < 32:
+            problems.append("JWT_SECRET belum di-set / terlalu pendek (min 32 karakter).")
+        if not self.CREDENTIAL_ENCRYPTION_KEY:
+            problems.append("CREDENTIAL_ENCRYPTION_KEY kosong.")
+        if not self.SUPABASE_URL or not self.SUPABASE_SERVICE_ROLE_KEY:
+            problems.append("SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY kosong.")
+        return problems
 
 
 settings = Settings()

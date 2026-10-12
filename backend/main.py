@@ -10,6 +10,7 @@ Swagger docs otomatis di http://localhost:8000/docs — enak buat ngetes
 semua endpoint sebelum frontend selesai.
 """
 import logging
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -29,11 +30,34 @@ from backend.services.live_autotrader import run_live_autotrade_cycle
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("trading-fellah")
 
-app = FastAPI(title="Trading Fellah API", version="1.0.0")
+scheduler = AsyncIOScheduler()
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Di production, gagal cepat kalau config fatal belum diisi — lebih baik
+    # crash saat boot (kelihatan di log deploy) daripada jalan dengan JWT
+    # secret default yang bisa dipalsukan siapa saja.
+    if settings.ENV == "production":
+        problems = settings.validate_for_production()
+        if problems:
+            raise RuntimeError("Config production tidak valid: " + " | ".join(problems))
+    if settings.ENV != "test":
+        scheduler.start()
+        logger.info("Scheduler jalan: news 10m, forward test 5m, live autotrade 5m, expiry 1h.")
+    try:
+        yield
+    finally:
+        if scheduler.running:
+            scheduler.shutdown(wait=False)
+
+
+app = FastAPI(title="Trading Fellah API", version="1.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_ORIGIN],
+    allow_origins=settings.cors_origins,
+    allow_origin_regex=settings.CORS_ORIGIN_REGEX or None,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -48,8 +72,14 @@ app.include_router(ai_routes.router)
 app.include_router(subscription_routes.router)
 
 
+@app.get("/")
+async def root():
+    return {"app": settings.APP_NAME, "docs": "/docs", "health": "/api/health"}
+
+
 @app.get("/api/health")
 async def health():
+    """Dipakai healthcheck Render/Railway/Docker. Sengaja TIDAK menyentuh DB."""
     return {"status": "online", "app": settings.APP_NAME, "env": settings.ENV}
 
 
@@ -59,9 +89,6 @@ async def health():
 # Kalau user sudah banyak/live, pisahin ke worker process terpisah
 # (celery/rq/dramatiq) biar gak numpuk beban di proses API yang sama.
 # ---------------------------------------------------------------------- #
-scheduler = AsyncIOScheduler()
-
-
 @scheduler.scheduled_job("interval", minutes=10)
 async def scheduled_news_refresh():
     try:
@@ -134,13 +161,6 @@ async def scheduled_subscription_expiry():
             logger.info(f"{len(expired.data)} subscription di-expire-kan.")
     except Exception as e:
         logger.error(f"Subscription expiry check gagal: {e}")
-
-
-@app.on_event("startup")
-async def start_scheduler():
-    if settings.ENV != "test":
-        scheduler.start()
-        logger.info("Scheduler jalan: news refresh tiap 10 menit, forward test tiap 5 menit.")
 
 
 if __name__ == "__main__":

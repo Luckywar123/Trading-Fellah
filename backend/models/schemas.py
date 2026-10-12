@@ -68,3 +68,13 @@ class KnowledgeItemRequest(BaseModel):
     title: str
     content: str
     tags: list[str] = []
+
+
+class ChatTurn(BaseModel):
+    role: str = Field(..., pattern="^(user|assistant)$")
+    content: str = Field(..., max_length=2000)
+
+
+class ChatRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=2000)
+    history: list[ChatTurn] = []

@@ -6,6 +6,7 @@ import {
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAccounts } from '../context/AccountContext.jsx'
 import { api } from '../lib/api.js'
+import AIChatWidget from './AIChatWidget.jsx'
 
 const NAV = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutGrid },
@@ -143,6 +144,7 @@ export default function Layout({ children }) {
         </header>
         <main className="flex-1 p-6 overflow-y-auto">{children}</main>
       </div>
+      <AIChatWidget />
     </div>
   )
 }

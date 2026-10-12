@@ -1,0 +1,44 @@
+# Render Blueprint — New + -> Blueprint -> pilih repo ini.
+# Isi env var bertanda sync:false lewat dashboard Render (jangan commit secret).
+services:
+  - type: web
+    name: trading-fellah-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    plan: starter            # free tier sleep -> scheduler berhenti, jangan dipakai buat live trading
+    healthCheckPath: /api/health
+    numInstances: 1          # JANGAN > 1 (scheduler autotrade bisa dobel order)
+    envVars:
+      - key: ENV
+        value: production
+      - key: FRONTEND_ORIGIN
+        sync: false          # contoh: https://trading-fellah.vercel.app
+      - key: CORS_EXTRA_ORIGINS
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CREDENTIAL_ENCRYPTION_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: METAAPI_TOKEN
+        sync: false
+      - key: METAAPI_REGION
+        value: new-york
+      - key: AI_PROVIDER
+        value: anthropic
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: NEWS_PROVIDER
+        value: finnhub
+      - key: NEWS_API_KEY
+        sync: false
+      - key: NOWPAYMENTS_API_KEY
+        sync: false
+      - key: NOWPAYMENTS_IPN_SECRET
+        sync: false
+      - key: MIDTRANS_SERVER_KEY
+        sync: false

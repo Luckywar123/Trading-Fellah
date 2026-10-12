@@ -1,0 +1,16 @@
+:root {
+  --primary: #6d4aff;
+  --success: #10b981;
+  --danger: #ef4444;
+  --bg: #1f2937;
+  --bg-card: #374151;
+  --text: #f9fafb;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: sans-serif; background: var(--bg); color: var(--text); }
+.container { max-width: 1600px; margin: 0 auto; padding: 20px; }
+.card { background: var(--bg-card); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+.btn { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; }
+.btn-primary { background: var(--primary); color: white; }
+.badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; }

@@ -14,6 +14,7 @@ Provider berita default: Finnhub (ada free tier). Ganti NEWS_PROVIDER +
 NEWS_API_KEY di .env kalau mau pakai provider lain — tinggal tambah cabang
 di `_fetch_raw_news()`.
 """
+import asyncio
 from datetime import datetime, timedelta, timezone
 
 import httpx
@@ -54,7 +55,7 @@ async def fetch_and_score_news(symbols: list[str] | None = None) -> list[dict]:
         if not headline:
             continue
         try:
-            analysis = agent.analyze_news_sentiment(headline, body, symbols)
+            analysis = await asyncio.to_thread(agent.analyze_news_sentiment, headline, body, symbols)
         except Exception as e:
             analysis = {"sentiment": "neutral", "sentiment_score": 0, "impact_level": "low",
                         "currency_impact": [], "summary": f"AI gagal analisa: {e}"}

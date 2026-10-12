@@ -16,11 +16,37 @@ Semua fungsi minta output JSON terstruktur dari LLM biar gampang dipakai
 program (bukan free text yang harus di-parse manual).
 """
 import json
+import logging
 import re
+import time
 from typing import Optional
 
 from backend.config import settings
 from backend.db.supabase_client import get_supabase
+
+
+logger = logging.getLogger(__name__)
+
+_POSITIVE = ("rise", "surge", "beat", "hawkish", "strong", "rally", "gain", "hike", "growth")
+_NEGATIVE = ("fall", "drop", "miss", "dovish", "weak", "slump", "loss", "cut", "recession")
+_HIGH_IMPACT = ("nfp", "non-farm", "cpi", "fomc", "interest rate", "rate decision", "gdp",
+                "unemployment", "ecb", "boj")
+
+
+def rule_based_news_sentiment(headline: str, body: str = "") -> dict:
+    """Fallback tanpa LLM: dipakai kalau API key AI belum diisi / provider lagi down.
+    Kasar, tapi deterministik — dan jauh lebih aman daripada pipeline berita mati total."""
+    text = f"{headline} {body}".lower()
+    pos = sum(w in text for w in _POSITIVE)
+    neg = sum(w in text for w in _NEGATIVE)
+    score = 0.0 if pos == neg else (0.4 if pos > neg else -0.4)
+    return {
+        "sentiment": "buy" if score > 0 else "sell" if score < 0 else "neutral",
+        "sentiment_score": score,
+        "impact_level": "high" if any(k in text for k in _HIGH_IMPACT) else "low",
+        "currency_impact": [],
+        "summary": "Analisa rule-based (AI provider tidak tersedia).",
+    }
 
 
 def _extract_json(text: str) -> dict:
@@ -42,11 +68,24 @@ class AIAgent:
 
     # ------------------------------------------------------------------ #
     def _complete(self, system: str, user: str, max_tokens: int = 800) -> str:
-        if self.provider == "anthropic":
-            return self._complete_anthropic(system, user, max_tokens)
-        elif self.provider == "openai":
-            return self._complete_openai(system, user, max_tokens)
-        raise ValueError(f"AI_PROVIDER tidak dikenal: {self.provider}")
+        if self.provider not in ("anthropic", "openai"):
+            raise ValueError(f"AI_PROVIDER tidak dikenal: {self.provider}")
+        # retry 3x dengan exponential backoff buat error sementara (429/5xx/timeout).
+        # Error konfigurasi (API key kosong) langsung dilempar tanpa retry.
+        last_err: Exception | None = None
+        for attempt in range(3):
+            try:
+                if self.provider == "anthropic":
+                    return self._complete_anthropic(system, user, max_tokens)
+                return self._complete_openai(system, user, max_tokens)
+            except RuntimeError:
+                raise
+            except Exception as e:  # noqa: BLE001
+                last_err = e
+                wait = 2 ** attempt
+                logger.warning("AI call gagal (percobaan %d/3): %s — retry %ds", attempt + 1, e, wait)
+                time.sleep(wait)
+        raise RuntimeError(f"AI provider gagal setelah 3 percobaan: {last_err}")
 
     def _complete_anthropic(self, system: str, user: str, max_tokens: int) -> str:
         import anthropic
@@ -96,8 +135,12 @@ class AIAgent:
             "\"summary\": \"<1-2 kalimat kenapa>\"}"
         )
         user = f"Headline: {headline}\nIsi: {body}\nSimbol relevan: {symbols or 'auto-deteksi'}"
-        raw = self._complete(system, user, max_tokens=400)
-        return _extract_json(raw)
+        try:
+            raw = self._complete(system, user, max_tokens=400)
+            return _extract_json(raw)
+        except Exception as e:  # noqa: BLE001
+            logger.error("analyze_news_sentiment fallback ke rule-based: %s", e)
+            return rule_based_news_sentiment(headline, body)
 
     def generate_trade_rationale(self, *, symbol: str, direction: str, signal_type: str,
                                   price: float, zone: dict, technical_summary: dict,
@@ -135,6 +178,23 @@ class AIAgent:
         result = _extract_json(raw)
         result["trades_analyzed"] = len(sample)
         return result
+
+
+    def chat(self, message: str, history: list[dict] | None = None, context: str = "") -> str:
+        """Asisten chat untuk widget AI di dashboard (tanya sinyal, risiko, istilah trading)."""
+        system = (
+            "Kamu asisten trading di platform Trading Fellah. Jawab dalam bahasa yang sama "
+            "dengan user, singkat dan praktis. Jelaskan risiko, bukan cuma peluang. Jangan "
+            "pernah menjamin profit, dan ingatkan bahwa ini bukan nasihat keuangan jika user "
+            "minta keputusan beli/jual spesifik. Kamu TIDAK bisa mengeksekusi order."
+        )
+        if context:
+            system += f"\n\nKonteks tambahan:\n{context}"
+        convo = ""
+        for turn in (history or [])[-6:]:
+            who = "User" if turn.get("role") == "user" else "Asisten"
+            convo += f"{who}: {str(turn.get('content', ''))[:1000]}\n"
+        return self._complete(system, f"{convo}User: {message[:2000]}\nAsisten:", max_tokens=600).strip()
 
 
 agent = AIAgent()

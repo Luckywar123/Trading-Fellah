@@ -1,8 +1,12 @@
+import asyncio
+import time
+from collections import defaultdict, deque
+
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from backend.auth.siwe import get_current_user
 from backend.db.supabase_client import get_supabase
-from backend.models.schemas import KnowledgeItemRequest
+from backend.models.schemas import ChatRequest, KnowledgeItemRequest
 from backend.services.ownership import get_owned_account as _get_owned_account
 from backend.services import news_service
 from backend.services.ai_agent import agent
@@ -47,7 +51,7 @@ async def generate_behavior_profile(account_id: str, user: dict = Depends(get_cu
         raise HTTPException(status.HTTP_400_BAD_REQUEST,
                              "Butuh minimal 5 trade histori dulu buat bikin profil kebiasaan yang berarti.")
 
-    result = agent.analyze_trading_behavior(trades)
+    result = await asyncio.to_thread(agent.analyze_trading_behavior, trades)
     row = sb.table("ai_behavior_profiles").insert({
         "user_id": user["id"], "trades_analyzed": result.get("trades_analyzed", len(trades)),
         "summary": result.get("summary"), "tendencies": result.get("tendencies"),
@@ -79,3 +83,33 @@ async def add_knowledge(body: KnowledgeItemRequest, user: dict = Depends(get_cur
         "title": body.title, "content": body.content, "tags": body.tags, "added_by": user["id"],
     }).execute().data[0]
     return row
+
+
+# ---------------------------------------------------------------------- #
+# Chat widget. Rate limit sederhana per-user (in-memory, per proses) biar
+# satu user gak bisa menguras kredit API AI kamu.
+# ---------------------------------------------------------------------- #
+_CHAT_LIMIT = 15          # request
+_CHAT_WINDOW = 60         # detik
+_chat_hits: dict[str, deque] = defaultdict(deque)
+
+
+def _check_chat_rate_limit(user_id: str) -> None:
+    now = time.monotonic()
+    q = _chat_hits[user_id]
+    while q and now - q[0] > _CHAT_WINDOW:
+        q.popleft()
+    if len(q) >= _CHAT_LIMIT:
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS,
+                             "Terlalu banyak pesan, coba lagi sebentar lagi.")
+    q.append(now)
+
+
+@router.post("/chat")
+async def chat(body: ChatRequest, user: dict = Depends(get_current_user)):
+    _check_chat_rate_limit(user["id"])
+    try:
+        reply = await asyncio.to_thread(agent.chat, body.message, [h.model_dump() for h in body.history])
+    except RuntimeError as e:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, f"AI belum tersedia: {e}")
+    return {"response": reply}

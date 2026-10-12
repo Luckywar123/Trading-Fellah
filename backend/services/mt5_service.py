@@ -16,7 +16,10 @@ SDK method di bawah ini mengikuti pola resmi metaapi-cloud-sdk python
 (https://metaapi.cloud/docs/client/python/). Cek versi terbaru sebelum
 deploy production karena SDK third-party ini kadang berubah antar rilis.
 """
+import asyncio
+import functools
 import logging
+import time
 from typing import Optional
 
 from metaapi_cloud_sdk import MetaApi
@@ -28,6 +31,58 @@ logger = logging.getLogger(__name__)
 
 _api: Optional[MetaApi] = None
 _connection_cache: dict = {}  # metaapi_account_id -> streaming connection (RPC)
+
+
+# ---------------------------------------------------------------------- #
+# Resilience: retry (khusus operasi BACA), eviction koneksi basi, dan circuit
+# breaker per akun. Operasi TULIS (open/close/modify order) SENGAJA tidak
+# di-retry otomatis: kalau request pertama sebenarnya sudah masuk ke broker
+# tapi responsnya timeout, retry bakal bikin order dobel pakai uang beneran.
+# ---------------------------------------------------------------------- #
+_FAIL_THRESHOLD = 5       # gagal berturut-turut sebelum breaker "open"
+_COOLDOWN_SECONDS = 60    # berapa lama breaker open
+_failures: dict[str, int] = {}
+_open_until: dict[str, float] = {}
+
+
+def _check_breaker(account_id: str) -> None:
+    until = _open_until.get(account_id, 0)
+    if until > time.monotonic():
+        raise RuntimeError(
+            f"MetaApi sementara dihentikan untuk akun ini (terlalu banyak error). "
+            f"Coba lagi dalam {int(until - time.monotonic())} detik."
+        )
+
+
+def _record_failure(account_id: str) -> None:
+    _connection_cache.pop(account_id, None)   # paksa reconnect di panggilan berikutnya
+    _failures[account_id] = _failures.get(account_id, 0) + 1
+    if _failures[account_id] >= _FAIL_THRESHOLD:
+        _open_until[account_id] = time.monotonic() + _COOLDOWN_SECONDS
+        _failures[account_id] = 0
+        logger.error("Circuit breaker OPEN untuk akun MetaApi %s selama %ds", account_id, _COOLDOWN_SECONDS)
+
+
+def resilient(retries: int = 0):
+    """retries=0 -> tanpa retry (operasi tulis). retries=2 -> total 3 percobaan (operasi baca)."""
+    def deco(fn):
+        @functools.wraps(fn)
+        async def wrapper(metaapi_account_id: str, *args, **kwargs):
+            _check_breaker(metaapi_account_id)
+            last: Exception | None = None
+            for attempt in range(retries + 1):
+                try:
+                    result = await fn(metaapi_account_id, *args, **kwargs)
+                    _failures[metaapi_account_id] = 0
+                    return result
+                except Exception as e:  # noqa: BLE001
+                    last = e
+                    _record_failure(metaapi_account_id)
+                    if attempt < retries:
+                        await asyncio.sleep(2 ** attempt)
+            raise last  # type: ignore[misc]
+        return wrapper
+    return deco
 
 
 def _client() -> MetaApi:
@@ -72,6 +127,7 @@ async def _get_connection(metaapi_account_id: str):
     return connection
 
 
+@resilient(retries=2)
 async def get_account_info(metaapi_account_id: str) -> dict:
     """Balance, equity, margin, free margin, margin level — buat dashboard."""
     conn = await _get_connection(metaapi_account_id)
@@ -89,6 +145,7 @@ async def get_account_info(metaapi_account_id: str) -> dict:
     }
 
 
+@resilient(retries=2)
 async def get_open_positions(metaapi_account_id: str) -> list[dict]:
     conn = await _get_connection(metaapi_account_id)
     positions = await conn.get_positions()
@@ -108,6 +165,7 @@ async def get_open_positions(metaapi_account_id: str) -> list[dict]:
     } for p in positions]
 
 
+@resilient(retries=0)
 async def open_market_order(metaapi_account_id: str, symbol: str, direction: str,
                              volume: float, stop_loss: float | None = None,
                              take_profit: float | None = None, comment: str = "") -> dict:
@@ -125,12 +183,14 @@ async def open_market_order(metaapi_account_id: str, symbol: str, direction: str
     }
 
 
+@resilient(retries=0)
 async def close_position(metaapi_account_id: str, ticket: str) -> dict:
     conn = await _get_connection(metaapi_account_id)
     result = await conn.close_position(ticket)
     return {"ticket": ticket, "raw": result}
 
 
+@resilient(retries=0)
 async def modify_position(metaapi_account_id: str, ticket: str,
                            stop_loss: float | None = None, take_profit: float | None = None) -> dict:
     conn = await _get_connection(metaapi_account_id)
@@ -138,6 +198,7 @@ async def modify_position(metaapi_account_id: str, ticket: str,
     return {"ticket": ticket, "raw": result}
 
 
+@resilient(retries=2)
 async def get_historical_candles(metaapi_account_id: str, symbol: str,
                                   timeframe: str, start_time, limit: int = 1000) -> list[dict]:
     """Buat backtest engine & swing/order-block detection."""
@@ -146,6 +207,7 @@ async def get_historical_candles(metaapi_account_id: str, symbol: str,
     return candles
 
 
+@resilient(retries=2)
 async def get_symbol_spec(metaapi_account_id: str, symbol: str) -> dict:
     """
     Ambil spesifikasi kontrak ASLI dari broker (bukan angka forex standar
