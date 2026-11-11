@@ -5,6 +5,8 @@ import {
   Newspaper, Radar, Siren, ArrowRight, Check,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
+import MetaMaskButton from '../components/MetaMaskButton.jsx'
+import DashboardPreview from '../components/DashboardPreview.jsx'
 
 const FEATURES = [
   {
@@ -40,7 +42,7 @@ const FEATURES = [
 ]
 
 const STEPS = [
-  { title: 'Connect wallet', body: 'Sign-in pakai wallet crypto kamu — tanda tangan pesan sekali, gratis, gak ada transaksi on-chain, gak perlu email/password.' },
+  { title: 'Login MetaMask', body: 'Sign-in pakai MetaMask kamu — tanda tangan pesan sekali, gratis, gak ada transaksi on-chain, gak perlu email/password.' },
   { title: 'Tautkan akun MT5', body: 'Hubungkan akun MT5 broker kamu (demo dulu juga bisa) buat mulai eksplorasi sinyal dan backtest.' },
   { title: 'Atur risk, lalu jalan', body: 'Pilih preset risk, coba Forward Test beberapa hari, baru pertimbangkan nyalain live dengan preset kecil.' },
 ]
@@ -68,61 +70,25 @@ export default function Landing() {
             <Crosshair size={22} className="text-amber" strokeWidth={1.5} />
             <span className="font-display font-semibold tracking-tight">TRADING FELLAH</span>
           </div>
-          <Link
-            to="/login"
-            className="text-sm font-semibold bg-amber text-void rounded-md px-4 py-2 hover:brightness-110 transition focus-ring"
-          >
-            Connect Wallet
-          </Link>
+          <MetaMaskButton />
         </div>
       </header>
 
-      {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.06]">
-          <svg width="900" height="900" viewBox="0 0 900 900">
-            <circle cx="450" cy="450" r="420" fill="none" stroke="#F0A030" strokeWidth="1" />
-            <circle cx="450" cy="450" r="320" fill="none" stroke="#F0A030" strokeWidth="1" />
-            <circle cx="450" cy="450" r="220" fill="none" stroke="#F0A030" strokeWidth="1" />
-            <line x1="450" y1="0" x2="450" y2="900" stroke="#F0A030" strokeWidth="1" />
-            <line x1="0" y1="450" x2="900" y2="450" stroke="#F0A030" strokeWidth="1" />
-          </svg>
-        </div>
-
-        <div className="relative max-w-4xl mx-auto px-6 pt-20 pb-16 text-center">
-          <div className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-amber font-mono border border-amber-dim/40 bg-amber-soft rounded-full px-3 py-1 mb-6">
-            <Crosshair size={12} /> Sniper Terminal buat MT5
-          </div>
-          <h1 className="font-display text-4xl sm:text-5xl font-semibold tracking-tight leading-tight">
-            Eksekusi trading MT5 kamu,<br className="hidden sm:block" /> dibantu AI yang jelasin alasannya.
-          </h1>
-          <p className="mt-5 text-ink-muted text-base leading-relaxed max-w-2xl mx-auto">
-            Tautkan akun MT5 broker manapun, dapetin sinyal swing/order block/S&R dari AI,
-            atur sendiri agresivitas risk-nya, dan uji dulu pakai backtest &amp; forward test
-            sebelum berani ke akun live. Login pakai wallet, bukan email/password.
-          </p>
-          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Link
-              to="/login"
-              className="w-full sm:w-auto bg-amber text-void font-semibold text-sm rounded-md px-6 py-3 flex items-center justify-center gap-2 hover:brightness-110 transition focus-ring"
-            >
-              <Wallet size={16} /> Connect Wallet &amp; Mulai
-            </Link>
-            <a
-              href="#fitur"
-              className="w-full sm:w-auto border border-line text-ink-muted text-sm rounded-md px-6 py-3 flex items-center justify-center gap-2 hover:bg-raised hover:text-ink transition"
-            >
-              Lihat fitur <ArrowRight size={14} />
-            </a>
-          </div>
-
-          <p className="mt-8 text-xs text-ink-faint font-mono leading-relaxed max-w-xl mx-auto">
-            Trading forex/crypto pakai leverage berisiko tinggi dan bisa bikin rugi modal.
-            Platform ini alat eksekusi &amp; riset, bukan nasihat finansial — belum pernah
-            divalidasi pakai data pasar asli, jalanin Forward Test dulu sebelum live.
-          </p>
-        </div>
-      </section>
+      {/* Dashboard preview dulu, login MetaMask ada di topbar */}
+      <DashboardPreview />
+      <div className="max-w-3xl mx-auto px-6 pb-12 text-center">
+        <p className="text-sm text-ink-muted leading-relaxed">
+          Tautkan akun MT5 broker manapun, dapetin sinyal swing/order block/S&amp;R dari AI, atur risk
+          sendiri, dan uji pakai backtest &amp; forward test sebelum ke akun live.
+        </p>
+        <a href="#fitur" className="inline-flex items-center gap-2 mt-4 text-sm text-amber hover:underline">
+          Lihat fitur <ArrowRight size={14} />
+        </a>
+        <p className="mt-6 text-xs text-ink-faint font-mono leading-relaxed">
+          Trading forex/crypto pakai leverage berisiko tinggi dan bisa bikin rugi modal.
+          Platform ini alat eksekusi &amp; riset, bukan nasihat finansial.
+        </p>
+      </div>
 
       {/* Features */}
       <section id="fitur" className="border-t border-line">
@@ -239,14 +205,9 @@ export default function Landing() {
         <div className="max-w-2xl mx-auto px-6 py-16 text-center">
           <h2 className="font-display text-2xl font-semibold mb-3">Siap coba?</h2>
           <p className="text-sm text-ink-muted mb-6">
-            Connect wallet, tautkan MT5 demo, dan lihat sendiri sinyalnya sebelum mikirin live.
+            Login MetaMask, tautkan MT5 demo, dan lihat sendiri sinyalnya sebelum mikirin live.
           </p>
-          <Link
-            to="/login"
-            className="inline-flex items-center gap-2 bg-amber text-void font-semibold text-sm rounded-md px-6 py-3 hover:brightness-110 transition"
-          >
-            <Wallet size={16} /> Connect Wallet
-          </Link>
+          <MetaMaskButton className="px-6 py-3" />
         </div>
       </section>
 

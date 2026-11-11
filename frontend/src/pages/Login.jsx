@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Crosshair, Loader2, ArrowLeft } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
-import { isWalletAvailable } from '../lib/wallet.js'
+import { isMetaMaskAvailable, METAMASK_INSTALL_URL } from '../lib/wallet.js'
 
 export default function Login() {
   const { login, error } = useAuth()
@@ -44,9 +44,9 @@ export default function Login() {
         </div>
 
         <div className="panel scanline-edge p-7 text-center">
-          <h1 className="font-display text-xl font-semibold mb-1.5">Masuk pakai wallet</h1>
+          <h1 className="font-display text-xl font-semibold mb-1.5">Masuk pakai MetaMask</h1>
           <p className="text-sm text-ink-muted mb-7 leading-relaxed">
-            Gak ada email, gak ada password. Sign-in pakai wallet crypto kamu —
+            Gak ada email, gak ada password. Sign-in pakai MetaMask —
             tanda tangan pesan sekali, gratis, gak ada transaksi on-chain.
           </p>
 
@@ -56,13 +56,12 @@ export default function Login() {
             className="w-full bg-amber text-void font-semibold text-sm rounded-md py-3 flex items-center justify-center gap-2 hover:brightness-110 transition disabled:opacity-60 focus-ring"
           >
             {busy ? <Loader2 size={16} className="animate-spin" /> : <Crosshair size={16} />}
-            {busy ? 'Menunggu tanda tangan…' : 'Connect Wallet'}
+            {busy ? 'Menunggu tanda tangan…' : 'Login dengan MetaMask'}
           </button>
 
-          {!isWalletAvailable() && (
+          {!isMetaMaskAvailable() && (
             <p className="mt-4 text-xs text-short leading-relaxed">
-              Wallet extension gak terdeteksi. Install MetaMask (atau wallet EVM kompatibel
-              lain) dulu di browser ini, terus refresh halaman.
+              MetaMask gak terdeteksi. <a className="underline" href={METAMASK_INSTALL_URL} target="_blank" rel="noreferrer">Install MetaMask</a> (atau nonaktifin wallet lain kayak Talisman), terus refresh halaman.
             </p>
           )}
           {error && <p className="mt-4 text-xs text-short">{error}</p>}

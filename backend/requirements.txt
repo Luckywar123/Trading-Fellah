@@ -6,7 +6,7 @@ pydantic-settings==2.7.0
 python-multipart==0.0.20
 
 # --- Supabase / Postgres ---
-supabase==2.11.0
+supabase==2.16.0
 
 # --- Auth (Sign-In With Ethereum) ---
 eth-account==0.13.4
